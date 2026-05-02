@@ -1,4 +1,6 @@
 import pandas as pd
+import numpy as np
+import re
 
 def get_numerical_column_features(col):
     """
@@ -15,7 +17,7 @@ def get_numerical_column_features(col):
     ========================================
     """
     features = {}
-    features['dtype'] = col.dtype
+    features['dtype'] = pd.api.types.infer_dtype(col)
     missing_count = col.isnull().sum()
     missing_percent = col.isnull().mean() * 100
     features['missing_percent'] = list((missing_count, missing_percent))
@@ -47,7 +49,7 @@ def get_categorical_column_features(col):
     ========================================
     """
     features = {}
-    features['dtype'] = col.dtype
+    features['dtype'] = pd.api.types.infer_dtype(col)
     missing_count = col.isnull().sum()
     missing_percent = col.isnull().mean() * 100
     features['missing_percent'] = list((missing_count, missing_percent))
@@ -59,3 +61,30 @@ def get_categorical_column_features(col):
     features['balanced'] = not (top_percents.max() > 70)
     features['cardinality'] = 'High' if features['num_unique'] > 10 else 'Medium' if features['num_unique'] > 3 else 'Low'
     return features
+
+NULL_STRINGS = {'', 'nan', 'none', 'null', 'na', 'n/a', '#n/a', 'missing'}
+DATE_RE = re.compile(r'^\d{4}[-/]\d{1,2}[-/]\d{1,2}|^\d{1,2}[-/]\d{1,2}[-/]\d{4}')
+
+def infer_cell_type(val):
+    if not isinstance(val, str):
+        return np.nan if (val is None or (isinstance(val, float) and np.isnan(val))) else val
+
+    s = val.strip()
+
+    if s.lower() in NULL_STRINGS:  return np.nan
+    if s.lower() == 'true':        return True
+    if s.lower() == 'false':       return False
+
+    try: return int(s)
+    except: pass
+
+    try: return float(s)
+    except: pass
+
+    if DATE_RE.match(s):
+        try:
+            p = pd.to_datetime(s, errors='raise')
+            return p.to_pydatetime() if (p.hour or p.minute or p.second) else p.date()
+        except: pass
+
+    return s.strip("'\"")

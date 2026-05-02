@@ -1,12 +1,30 @@
 import pandas as pd
 import utils
-import pprint
 
 # Load the dataset
-df = pd.read_csv('data/Autism_Data.arff')
+df = pd.read_csv('data/test_datatypes.csv', dtype=object)
+# Infer cell types
+df = df.apply(lambda col: col.map(utils.infer_cell_type))
 
-# List of columns
+# Table Profiling
 columns = df.columns
+rows = df.shape[0]
+duplicates = df.duplicated().sum()
+missing_values = df.isnull().sum()
+missing_percent = df.isnull().mean() * 100
+Dataset_size = df.memory_usage(deep=True).sum() / (1024 ** 2)
+
+# Table Profiling
+print(f"========================================")
+print(f"TABLE PROFILING")
+print(f"----------------------------------------")
+print(f"Number of Columns : {len(columns)}")
+print(f"Number of Rows    : {rows}")
+print(f"Duplicate Rows    : {duplicates} ({(duplicates/rows)*100:.2f}%)")
+print(f"Missing Values    : {missing_values.sum()} ({missing_percent.mean():.2f}%)")
+print(f"Dataset Size      : {Dataset_size:.2f} MB\n")
+
+numerical_columns = df.select_dtypes(include=['number']).columns
 
 # Column Profiling
 for column in columns:
@@ -37,3 +55,8 @@ for column in columns:
         print(f"Cardinality       : {features['cardinality']}")
         print()
 
+# Cross Column Profiling
+print(f"========================================")
+print(f"CROSS COLUMN PROFILING")
+print(f"----------------------------------------")
+print(df[numerical_columns].corr())
