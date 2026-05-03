@@ -2,7 +2,7 @@
 <html class="light" lang="en"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>DataProfile AI - Upload</title>
+<title>DataProfile - Upload</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -47,7 +47,7 @@ body { min-height: 100dvh; }
 <header class="fixed top-0 z-50 w-full flex items-center justify-between px-6 h-16 bg-white shadow-sm border-b border-gray-100">
     <div class="flex items-center gap-3">
         <span class="material-symbols-outlined text-indigo-600" data-icon="analytics">analytics</span>
-        <h1 class="text-lg font-bold tracking-tight text-gray-900">DataProfile AI</h1>
+        <h1 class="text-lg font-bold tracking-tight text-gray-900">DataProfile</h1>
     </div>
 </header>
 <!-- Main Canvas -->
@@ -58,12 +58,12 @@ body { min-height: 100dvh; }
             <p class="text-on-surface-variant max-w-[280px] mx-auto">Upload your CSV dataset to start the profiling process.</p>
         </div>
         <div id="uploadArea" class="bg-white custom-dashed-border p-8 flex flex-col items-center justify-center text-center space-y-6 min-h-[320px] cursor-pointer hover:bg-surface-container transition-colors">
-            <input type="file" id="fileInput" accept=".csv" name="file" class="hidden">
+            <input type="file" id="fileInput" accept=".csv" name="files" class="hidden" multiple="multiple">
             <div class="w-16 h-16 rounded-full bg-primary-fixed flex items-center justify-center pointer-events-none">
                 <span class="material-symbols-outlined text-primary text-4xl" data-icon="cloud_upload">cloud_upload</span>
             </div>
             <div class="space-y-1 pointer-events-none">
-                <p class="text-xl font-semibold text-on-surface">Drag and drop your file here</p>
+                <p class="text-xl font-semibold text-on-surface">Drag and drop your files here</p>
                 <p class="text-sm text-on-surface-variant">Max file size: 50MB</p>
             </div>
             <div id="selectedFile" class="hidden text-sm text-primary font-medium mt-2 pointer-events-none">Selected: <span id="fileName"></span></div>
@@ -73,24 +73,59 @@ body { min-height: 100dvh; }
             </button>
             <div class="flex items-center gap-2 pt-2 pointer-events-none">
                 <span class="material-symbols-outlined text-primary text-base" data-icon="description">description</span>
-                <span class="text-xs font-semibold text-on-surface-variant">Accepted format: .csv</span>
-            </div>
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-            <div class="bg-white border border-gray-200 p-4 rounded-lg flex flex-col gap-1">
-                <span class="material-symbols-outlined text-secondary" data-icon="security">security</span>
-                <span class="text-xs font-semibold text-on-surface uppercase">Secure</span>
-                <p class="text-sm text-on-surface-variant leading-tight">Encrypted at rest</p>
-            </div>
-            <div class="bg-white border border-gray-200 p-4 rounded-lg flex flex-col gap-1">
-                <span class="material-symbols-outlined text-tertiary" data-icon="bolt">bolt</span>
-                <span class="text-xs font-semibold text-on-surface uppercase">Fast</span>
-                <p class="text-sm text-on-surface-variant leading-tight">Instant indexing</p>
+                <span class="text-xs font-semibold text-on-surface-variant">Accepted format: .csv (Multiple allowed)</span>
             </div>
         </div>
     </form>
 </main>
+<!-- Toast container -->
+<div id="toastContainer" class="fixed top-6 right-6 z-50 flex flex-col gap-2"></div>
 <script>
+    // Show a brief toast notification (safe: uses textContent)
+    function showToast(message, type = 'info', timeout = 6000) {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = 'max-w-xs w-full px-4 py-2 rounded shadow-lg flex items-start gap-3 pointer-events-auto';
+        toast.style.opacity = '0';
+        toast.style.transition = 'transform .12s ease, opacity .12s ease';
+        if (type === 'error') {
+            toast.classList.add('bg-red-50', 'border', 'border-red-200', 'text-red-800');
+        } else if (type === 'success') {
+            toast.classList.add('bg-green-50', 'border', 'border-green-200', 'text-green-800');
+        } else {
+            toast.classList.add('bg-white', 'border', 'border-gray-200', 'text-gray-900');
+        }
+
+        const msg = document.createElement('div');
+        msg.className = 'text-sm leading-tight break-words';
+        msg.textContent = message;
+
+        const close = document.createElement('button');
+        close.className = 'ml-auto text-xs opacity-60 hover:opacity-100';
+        close.textContent = '×';
+        close.addEventListener('click', () => {
+            try {
+                if (container.contains(toast)) {
+                    container.removeChild(toast);
+                }
+            } catch (e) {}
+        });
+
+        toast.appendChild(msg);
+        toast.appendChild(close);
+        container.appendChild(toast);
+
+        // entrance
+        requestAnimationFrame(() => {
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateY(0)';
+        });
+
+        // auto remove
+        setTimeout(() => {
+            try { if (container.contains(toast)) container.removeChild(toast); } catch (e) {}
+        }, timeout);
+    }
     const uploadArea = document.getElementById('uploadArea');
     const fileInput = document.getElementById('fileInput');
     const selectedFile = document.getElementById('selectedFile');
@@ -116,9 +151,13 @@ body { min-height: 100dvh; }
 
     fileInput.addEventListener('change', (e) => {
         if (e.target.files.length > 0) {
-            fileName.textContent = e.target.files[0].name;
+            if (e.target.files.length === 1) {
+                fileName.textContent = e.target.files[0].name;
+            } else {
+                fileName.textContent = `${e.target.files.length} files selected`;
+            }
             selectedFile.classList.remove('hidden');
-            submitBtn.textContent = 'Analyze Dataset';
+            submitBtn.textContent = 'Analyze Datasets';
         }
     });
 
@@ -137,9 +176,13 @@ body { min-height: 100dvh; }
         const files = e.dataTransfer.files;
         if (files.length > 0) {
             fileInput.files = files;
-            fileName.textContent = files[0].name;
+            if (files.length === 1) {
+                fileName.textContent = files[0].name;
+            } else {
+                fileName.textContent = `${files.length} files selected`;
+            }
             selectedFile.classList.remove('hidden');
-            submitBtn.textContent = 'Analyze Dataset';
+            submitBtn.textContent = 'Analyze Datasets';
         }
     });
 
@@ -150,25 +193,66 @@ body { min-height: 100dvh; }
             return;
         }
         const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
+        for (let i = 0; i < fileInput.files.length; i++) {
+            formData.append('files', fileInput.files[i]);
+        }
 
         loading.classList.remove('hidden');
         submitBtn.disabled = true;
 
         try {
             const response = await fetch('/upload', { method: 'POST', body: formData });
+            const data = await response.json().catch(() => null);
+
             if (response.ok) {
-                const html = await response.text();
-                document.open();
-                document.write(html);
-                document.close();
+                if (data && data.status === 'success') {
+                    // Full success - go to analysis of first file (keep loading/disabled during redirect)
+                    window.location.href = `/analysis/${encodeURIComponent(data.file_id)}`;
+                    return;
+                }
+
+                // Partial success or server-side handled errors
+                let hasScheduledRedirect = false;
+                if (data) {
+                    if (Array.isArray(data.errors) && data.errors.length) {
+                        data.errors.forEach(err => {
+                            showToast(`Error processing ${err.file}: ${err.error}`, 'error');
+                            console.error('Details for', err.file, err.error);
+                        });
+                    }
+
+                    if (Array.isArray(data.processed) && data.processed.length) {
+                        showToast(`${data.processed.length} file(s) processed successfully`, 'success');
+                        // navigate to first processed result if available
+                        if (data.file_id) {
+                            hasScheduledRedirect = true;
+                            setTimeout(() => window.location.href = `/analysis/${encodeURIComponent(data.file_id)}`, 900);
+                        }
+                    }
+                } else {
+                    showToast('Upload completed with unknown server response', 'error');
+                }
+
+                // Only reset UI if no redirect is pending
+                if (!hasScheduledRedirect) {
+                    loading.classList.add('hidden');
+                    submitBtn.disabled = false;
+                }
             } else {
-                alert('Error uploading file. Please try again.');
+                // HTTP error
+                if (data && Array.isArray(data.errors) && data.errors.length) {
+                    data.errors.forEach(err => showToast(`Error processing ${err.file}: ${err.error}`, 'error'));
+                } else if (data && data.message) {
+                    showToast(data.message, 'error');
+                } else {
+                    showToast('Error uploading file. Please try again.', 'error');
+                }
                 loading.classList.add('hidden');
                 submitBtn.disabled = false;
             }
         } catch (error) {
-            alert('Error: ' + error.message);
+            console.error(error);
+            showToast('Network or client error: ' + (error.message || error), 'error');
             loading.classList.add('hidden');
             submitBtn.disabled = false;
         }

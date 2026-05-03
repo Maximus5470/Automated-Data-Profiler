@@ -3,14 +3,20 @@ import utils
 import json
 import numpy as np
 
-def generate_profile(csv_path='data/Autism_Data.csv'):
-    """Generate data profiling and save to result.json"""
-    # Load the dataset
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
+
+def generate_profile(csv_path='data/Autism_Data.csv', save_path='result.json'):
     df = pd.read_csv(csv_path, dtype=object)
-    # Infer cell types
     df = df.apply(lambda col: col.map(utils.infer_cell_type))
 
-    # Create a dictionary to store the results
     results = {}
 
     # Table Profiling
@@ -21,7 +27,6 @@ def generate_profile(csv_path='data/Autism_Data.csv'):
     missing_percent = df.isnull().mean() * 100
     dataset_size = df.memory_usage(deep=True).sum() / (1024 ** 2)
 
-
     results["Number of Columns"] = len(columns)
     results["Number of Rows"] = rows
     results["Duplicate Rows"] = f"{duplicates} ({(duplicates/rows)*100:.2f}%)"
@@ -31,7 +36,7 @@ def generate_profile(csv_path='data/Autism_Data.csv'):
     numerical_columns = df.select_dtypes(include=['number']).columns
     results['column_profiling'] = {}
 
-    # Functional Dependency Analysis - precompute for all columns
+    # Functional Dependency 
     dependencies = {k:[] for k in columns}
     for col1 in columns:
         for col2 in columns:
@@ -71,23 +76,14 @@ def generate_profile(csv_path='data/Autism_Data.csv'):
     # Cross Column Profiling
     results['cross_column_profiling'] = df[numerical_columns].corr().to_dict()
 
-    # Functional Dependency Analysis summary
+    # Functional Dependency Analysis
     results['functional_dependency_analysis'] = {column: (', '.join(deps) if deps else "No strong dependencies") for column, deps in dependencies.items()}
 
-    # Custom JSON encoder to handle numpy types
-    class NpEncoder(json.JSONEncoder):
-        def default(self, obj):
-            if isinstance(obj, np.integer):
-                return int(obj)
-            if isinstance(obj, np.floating):
-                return float(obj)
-            if isinstance(obj, np.ndarray):
-                return obj.tolist()
-            return super(NpEncoder, self).default(obj)
-
-    # Write the results to a JSON file
-    with open('result.json', 'w') as f:
-        json.dump(results, f, indent=4, cls=NpEncoder)
+    if save_path:
+        with open(save_path, 'w') as f:
+            json.dump(results, f, indent=4, cls=NpEncoder)
+            
+    return results
 
 if __name__ == "__main__":
     generate_profile()

@@ -2,7 +2,7 @@
 <html class="light" lang="en"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>DataProfile AI - Dashboard</title>
+<title>DataProfile - Dashboard</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
@@ -40,11 +40,13 @@ tailwind.config = {
         </div>
     </div>
     <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto overflow-x-hidden">
-        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 px-2 sidebar-text">Current Analysis</p>
-        <a href="#" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors w-full" title="Analysis">
-            <span class="material-symbols-outlined flex-shrink-0">dashboard</span>
-            <span class="font-semibold whitespace-nowrap sidebar-text">Analysis</span>
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 px-2 sidebar-text">All Analyses</p>
+        {% for analysis in analyses %}
+        <a href="/analysis/{{ analysis }}" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 rounded-lg transition-colors w-full {% if analysis == current_file %}bg-indigo-50 text-indigo-600{% else %}text-gray-600 hover:bg-gray-50{% endif %}" title="{{ analysis }}">
+            <span class="material-symbols-outlined flex-shrink-0">{% if analysis == current_file %}dashboard{% else %}insert_chart{% endif %}</span>
+            <span class="font-semibold whitespace-nowrap sidebar-text truncate text-left">{{ analysis }}</span>
         </a>
+        {% endfor %}
     </nav>
 </aside>
 
@@ -61,7 +63,7 @@ tailwind.config = {
         <a href="/" class="px-4 py-2 bg-primary-container text-white rounded-lg hover:bg-primary transition-colors flex items-center gap-2 shadow-sm">
             <span class="material-symbols-outlined text-sm">upload</span> New Analysis
         </a>
-        <a href="/download-json" class="px-4 py-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm">
+        <a href="/download-json/{{ current_file | urlencode }}" class="px-4 py-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm">
             <span class="material-symbols-outlined text-sm text-gray-600">download</span> JSON
         </a>
     </div>
@@ -76,6 +78,25 @@ tailwind.config = {
             <p class="text-xs font-semibold text-primary tracking-widest uppercase">Project Overview</p>
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Dataset Analysis</h1>
         </section>
+
+        <!-- Uploaded Datasets Section -->
+        {% if analyses %}
+        <section class="space-y-3">
+            <div>
+                <h3 class="text-sm font-semibold text-gray-600 uppercase tracking-wider">Uploaded Datasets</h3>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                {% for analysis_id in analyses %}
+                <div class="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg" data-dataset-id="{{ analysis_id | e }}">
+                    <a href="/analysis/{{ analysis_id | urlencode }}" class="font-medium text-primary hover:underline" title="{{ analysis_id | e }}">{{ analysis_id | e }}</a>
+                    <button class="delete-dataset-btn ml-2 p-1 text-red-600 hover:bg-red-50 rounded transition-colors" data-file-id="{{ analysis_id | e }}" title="Delete this dataset">
+                        <span class="material-symbols-outlined text-sm">close</span>
+                    </button>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
 
         <!-- Summary Bento Grid -->
         <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -267,6 +288,8 @@ tailwind.config = {
     const toggleIcon = toggleSidebarBtn.querySelector('span');
     const sidebarTexts = document.querySelectorAll('.sidebar-text');
     const sidebarNavLinks = document.querySelectorAll('.sidebar-nav-link');
+    const currentFileId = {{ current_file | tojson }};
+    const allAnalyses = {{ analyses | tojson }};
 
     let isCollapsed = false;
 
@@ -288,6 +311,52 @@ tailwind.config = {
             sidebarTexts.forEach(el => el.classList.remove('opacity-0', 'invisible', 'w-0'));
             sidebarNavLinks.forEach(link => link.classList.remove('justify-center', 'px-3', 'gap-0'));
         }
+    });
+
+    // Delete individual dataset handler
+    document.querySelectorAll('.delete-dataset-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const fileId = btn.dataset.fileId;
+            const fileName = fileId;
+
+            if (!confirm(`Delete dataset "${fileName}"? This cannot be undone.`)) {
+                return;
+            }
+
+            btn.disabled = true;
+
+            try {
+                const encodedFileId = encodeURIComponent(fileId);
+                const response = await fetch(`/analysis/${encodedFileId}`, { method: 'DELETE' });
+                if (response.ok) {
+                    // Remove from UI using stable data attribute
+                    const container = document.querySelector(`[data-dataset-id="${CSS.escape(fileId)}"]`);
+                    if (container) {
+                        container.remove();
+                    }
+                    
+                    // If current file was deleted, find and navigate to next available
+                    if (fileId === currentFileId) {
+                        const remainingAnalyses = allAnalyses.filter(a => a !== fileId);
+                        if (remainingAnalyses.length > 0) {
+                            window.location.href = `/analysis/${encodeURIComponent(remainingAnalyses[0])}`;
+                        } else {
+                            // No more analyses, go to upload page
+                            window.location.href = '/';
+                        }
+                    }
+                } else {
+                    const data = await response.json().catch(() => ({ message: 'Unknown error' }));
+                    alert('Error deleting dataset: ' + (data.detail || data.message || 'Unknown error'));
+                    btn.disabled = false;
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert('Error deleting dataset: ' + error.message);
+                btn.disabled = false;
+            }
+        });
     });
 </script>
 
