@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from jinja2 import Environment, FileSystemLoader
 import json
@@ -10,6 +10,8 @@ import uuid
 import re
 
 app = FastAPI(title="Data Profiling Dashboard")
+SESSION_COOKIE_NAME = "dataprofiling_session"
+SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 
 template_dir = Path(__file__).parent / "templates"
 env = Environment(loader=FileSystemLoader(template_dir))
@@ -27,12 +29,59 @@ def resolve_runtime_dir(name: str) -> Path:
         fallback_dir.mkdir(parents=True, exist_ok=True)
         return fallback_dir
 
-uploads_dir = resolve_runtime_dir("uploads")
-results_dir = resolve_runtime_dir("results")
-manifest_path = results_dir / "manifest.json"
+storage_root = resolve_runtime_dir("storage")
+sessions_root = storage_root / "sessions"
+sessions_root.mkdir(parents=True, exist_ok=True)
 
 
-def load_analysis_manifest() -> dict:
+def normalize_session_id(session_id: str | None) -> str:
+    if session_id and re.match(r"^[A-Za-z0-9_-]+$", session_id):
+        return session_id
+    return uuid.uuid4().hex
+
+
+@app.middleware("http")
+async def session_middleware(request: Request, call_next):
+    session_id = normalize_session_id(request.cookies.get(SESSION_COOKIE_NAME))
+    request.state.session_id = session_id
+    response = await call_next(request)
+    if request.cookies.get(SESSION_COOKIE_NAME) != session_id:
+        response.set_cookie(
+            key=SESSION_COOKIE_NAME,
+            value=session_id,
+            max_age=SESSION_COOKIE_MAX_AGE,
+            httponly=True,
+            samesite="lax",
+            secure=request.url.scheme == "https",
+        )
+    return response
+
+
+def get_session_root(session_id: str) -> Path:
+    validated_session_id = normalize_session_id(session_id)
+    session_root = sessions_root / validated_session_id
+    session_root.mkdir(parents=True, exist_ok=True)
+    return session_root
+
+
+def get_uploads_dir(session_id: str) -> Path:
+    uploads_path = get_session_root(session_id) / "uploads"
+    uploads_path.mkdir(parents=True, exist_ok=True)
+    return uploads_path
+
+
+def get_results_dir(session_id: str) -> Path:
+    results_path = get_session_root(session_id) / "results"
+    results_path.mkdir(parents=True, exist_ok=True)
+    return results_path
+
+
+def get_manifest_path(session_id: str) -> Path:
+    return get_session_root(session_id) / "manifest.json"
+
+
+def load_analysis_manifest(session_id: str) -> dict:
+    manifest_path = get_manifest_path(session_id)
     if not manifest_path.exists(): return {}
     try:
         with open(manifest_path, "r", encoding="utf-8") as f:
@@ -41,7 +90,8 @@ def load_analysis_manifest() -> dict:
     except: return {}
 
 
-def save_analysis_manifest(manifest: dict) -> None:
+def save_analysis_manifest(session_id: str, manifest: dict) -> None:
+    manifest_path = get_manifest_path(session_id)
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=4)
 
@@ -58,19 +108,22 @@ def sanitize_filename(filename: str) -> str:
     return safe_name or 'file'
 
 @app.get("/", response_class=HTMLResponse)
-async def index():
+async def index(request: Request):
     """Serve the initial upload page"""
     template = env.get_template('upload.html')
     html_content = template.render()
     return html_content
 
 @app.post("/upload")
-async def upload_file(files: List[UploadFile] = File(...)):
+async def upload_file(request: Request, files: List[UploadFile] = File(...)):
     """Handle multiple file uploads and generate profile."""
     results = []
     errors = []
     first_file_id = None
-    manifest = load_analysis_manifest()
+    session_id = request.state.session_id
+    uploads_dir = get_uploads_dir(session_id)
+    results_dir = get_results_dir(session_id)
+    manifest = load_analysis_manifest(session_id)
 
     for file in files:
         unique_suffix = str(uuid.uuid4())[:8]
@@ -98,7 +151,7 @@ async def upload_file(files: List[UploadFile] = File(...)):
             data_profiler.generate_profile(str(temp_path), str(result_path))
 
             manifest[file_id] = file.filename
-            save_analysis_manifest(manifest)
+            save_analysis_manifest(session_id, manifest)
 
             results.append({"file": file.filename, "file_id": file_id, "result": str(result_path)})
 
@@ -116,13 +169,14 @@ async def upload_file(files: List[UploadFile] = File(...)):
     return {"status": "partial" if errors else "success", "processed": results, "errors": errors, "file_id": first_file_id}
 
 @app.get("/download-json/{file_id}")
-async def download_json(file_id: str):
+async def download_json(request: Request, file_id: str):
     """Download the JSON report for a specific analysis."""
     try:
         validated_id = validate_file_id(file_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid file_id")
 
+    results_dir = get_results_dir(request.state.session_id)
     json_file = results_dir / f"{validated_id}.json"
     if not str(json_file.resolve()).startswith(str(results_dir.resolve())):
         raise HTTPException(status_code=400, detail="Invalid file_id")
@@ -137,13 +191,14 @@ async def download_json(file_id: str):
     )
 
 @app.get("/analysis/{file_id}")
-async def view_analysis(file_id: str):
+async def view_analysis(request: Request, file_id: str):
     """Load specific profiling data and render HTML dashboard"""
     try:
         validated_id = validate_file_id(file_id)
     except ValueError:
         return RedirectResponse(url="/dashboard", status_code=302)
     
+    results_dir = get_results_dir(request.state.session_id)
     result_path = results_dir / f"{validated_id}.json"
     if not str(result_path.resolve()).startswith(str(results_dir.resolve())):
         return RedirectResponse(url="/dashboard", status_code=302)
@@ -154,12 +209,9 @@ async def view_analysis(file_id: str):
     with open(result_path, 'r') as f:
         profile_data = json.load(f)
 
-    manifest = load_analysis_manifest()
+    manifest = load_analysis_manifest(request.state.session_id)
     analyses = []
     for result_file in sorted(results_dir.glob("*.json")):
-        if result_file.name == manifest_path.name:
-            continue
-
         file_id = result_file.stem
         analyses.append({
             "id": file_id,
@@ -171,13 +223,14 @@ async def view_analysis(file_id: str):
     return HTMLResponse(content=html_content)
 
 @app.delete("/analysis/{file_id}")
-async def delete_analysis(file_id: str):
+async def delete_analysis(request: Request, file_id: str):
     """Delete an analysis report and its JSON file."""
     try:
         validated_id = validate_file_id(file_id)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid file_id")
     
+    results_dir = get_results_dir(request.state.session_id)
     result_path = results_dir / f"{validated_id}.json"
     if not str(result_path.resolve()).startswith(str(results_dir.resolve())):
         raise HTTPException(status_code=400, detail="Invalid file_id")
@@ -187,18 +240,19 @@ async def delete_analysis(file_id: str):
     
     try:
         result_path.unlink()
-        manifest = load_analysis_manifest()
+        manifest = load_analysis_manifest(request.state.session_id)
         if validated_id in manifest:
             manifest.pop(validated_id, None)
-            save_analysis_manifest(manifest)
+            save_analysis_manifest(request.state.session_id, manifest)
         return {"status": "success", "message": f"Analysis {validated_id} deleted"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not delete analysis: {str(e)}")
 
 @app.get("/dashboard", response_class=RedirectResponse)
-async def dashboard():
+async def dashboard(request: Request):
     """Redirect to the first available analysis or upload page"""
-    analyses = [f.stem for f in results_dir.glob("*.json") if f.name != manifest_path.name]
+    results_dir = get_results_dir(request.state.session_id)
+    analyses = [f.stem for f in results_dir.glob("*.json")]
     if analyses:
         return RedirectResponse(url=f"/analysis/{analyses[0]}")
     return RedirectResponse(url="/")
