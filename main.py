@@ -1,10 +1,15 @@
 import pandas as pd
 import utils
+import json
+import numpy as np
 
 # Load the dataset
-df = pd.read_csv('data/test_datatypes.csv', dtype=object)
+df = pd.read_csv('data/Autism_Data.csv', dtype=object)
 # Infer cell types
 df = df.apply(lambda col: col.map(utils.infer_cell_type))
+
+# Create a dictionary to store the results
+results = {}
 
 # Table Profiling
 columns = df.columns
@@ -12,70 +17,68 @@ rows = df.shape[0]
 duplicates = df.duplicated().sum()
 missing_values = df.isnull().sum()
 missing_percent = df.isnull().mean() * 100
-Dataset_size = df.memory_usage(deep=True).sum() / (1024 ** 2)
+dataset_size = df.memory_usage(deep=True).sum() / (1024 ** 2)
 
-# Table Profiling
-print(f"========================================")
-print(f"TABLE PROFILING")
-print(f"----------------------------------------")
-print(f"Number of Columns : {len(columns)}")
-print(f"Number of Rows    : {rows}")
-print(f"Duplicate Rows    : {duplicates} ({(duplicates/rows)*100:.2f}%)")
-print(f"Missing Values    : {missing_values.sum()} ({missing_percent.mean():.2f}%)")
-print(f"Dataset Size      : {Dataset_size:.2f} MB\n")
+
+results["Number of Columns"] = len(columns)
+results["Number of Rows"] = rows
+results["Duplicate Rows"] = f"{duplicates} ({(duplicates/rows)*100:.2f}%)"
+results["Missing Values"] = f"{missing_values.sum()} ({missing_percent.mean():.2f}%)"
+results["Dataset Size"] = f"{dataset_size:.2f} MB"
 
 numerical_columns = df.select_dtypes(include=['number']).columns
+results['column_profiling'] = {}
 
 # Column Profiling
 for column in columns:
     if pd.api.types.is_numeric_dtype(df[column]) or pd.api.types.is_datetime64_any_dtype(df[column]):
         features = utils.get_numerical_column_features(df[column])
-        print(f"========================================")
-        print(f"COLUMN: {column}")
-        print(f"----------------------------------------")
-        print(f"Type            : {features['dtype']}")
-        print(f"Missing %       : {features['missing_percent'][0]} ({features['missing_percent'][1]:.2f}%)")
-        print(f"Unique Values   : {features['num_unique']}")
-        print(f"Min             : {features['min_value']}")
-        print(f"Max             : {features['max_value']}")
+        results['column_profiling'][column] = {
+            "Type": features['dtype'],
+            "Missing %": f"{features['missing_percent'][0]} ({features['missing_percent'][1]:.2f}%)",
+            "Unique Values": features['num_unique'],
+            "Min": features['min_value'],
+            "Max": features['max_value']
+        }
         if 'mean_value' in features:
-            print(f"Mean            : {features['mean_value']:.4f}")
-            print(f"Std             : {features['std_value']:.4f}\n")
-        else:
-            print()
+            results['column_profiling'][column]['Mean'] = f"{features['mean_value']:.4f}"
+            results['column_profiling'][column]['Std'] = f"{features['std_value']:.4f}"
     else:
         features = utils.get_categorical_column_features(df[column])
-        print(f"========================================")
-        print(f"COLUMN: {column}")
-        print(f"----------------------------------------")
-        print(f"Type            : {features['dtype']}")
-        print(f"Missing %       : {features['missing_percent'][0]} ({features['missing_percent'][1]:.2f}%)")
-        print(f"Unique Values   : {features['num_unique']}")
-        print(f"Top Values      :")
-        for entity, value, percent in features['top_values']:
-            print(f"    {str(entity):<25}: {value} ({percent:>5.2f}%)")
-        print(f"Balanced Column  : {'Yes' if features['balanced'] else 'No'}")
-        print(f"Cardinality       : {features['cardinality']}")
-        print()
+        results['column_profiling'][column] = {
+            "Type": features['dtype'],
+            "Missing %": f"{features['missing_percent'][0]} ({features['missing_percent'][1]:.2f}%)",
+            "Unique Values": features['num_unique'],
+            "Top Values": {str(entity): f"{value} ({percent:>5.2f}%)" for entity, value, percent in features['top_values']},
+            "Balanced Column": 'Yes' if features['balanced'] else 'No',
+            "Cardinality": features['cardinality']
+        }
 
 # Cross Column Profiling
-print(f"========================================")
-print(f"CROSS COLUMN PROFILING")
-print(f"----------------------------------------")
-print(df[numerical_columns].corr())
+results['cross_column_profiling'] = df[numerical_columns].corr().to_dict()
 
 # Functional Dependency Analysis
-print(f"========================================")
-print(f"FUNCTIONAL DEPENDENCY ANALYSIS")
-print(f"----------------------------------------")
-
-dependancies = {k:[] for k in columns}
+dependencies = {k:[] for k in columns}
 for col1 in columns:
     for col2 in columns:
         if col1 != col2:
             dependency = df.groupby(col1)[col2].nunique()
             if (dependency <= 1).all():
-                dependancies[col1].append(col2)
+                dependencies[col1].append(col2)
 
-for column, deps in dependancies.items():
-    print(f"{column} -> {', '.join(deps)}") if deps else print(f"{column} -> No strong dependencies")
+results['functional_dependency_analysis'] = {column: (', '.join(deps) if deps else "No strong dependencies") for column, deps in dependencies.items()}
+
+# Custom JSON encoder to handle numpy types
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
+
+# Write the results to a JSON file
+with open('result.json', 'w') as f:
+    json.dump(results, f, indent=4, cls=NpEncoder)
