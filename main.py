@@ -5,13 +5,9 @@ import numpy as np
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, np.integer):
-            return int(obj)
-        if isinstance(obj, np.floating):
-            return float(obj)
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return super(NpEncoder, self).default(obj)
+        if isinstance(obj, (np.integer, np.floating)): return obj.item()
+        if isinstance(obj, np.ndarray): return obj.tolist()
+        return super().default(obj)
 
 def generate_profile(csv_path='data/Autism_Data.csv', save_path='result.json'):
     df = pd.read_csv(csv_path, dtype=object)
@@ -75,9 +71,6 @@ def generate_profile(csv_path='data/Autism_Data.csv', save_path='result.json'):
 
     # Cross Column Profiling
     results['cross_column_profiling'] = df[numerical_columns].corr().to_dict()
-
-    # Functional Dependency Analysis
-    results['functional_dependency_analysis'] = {column: (', '.join(deps) if deps else "No strong dependencies") for column, deps in dependencies.items()}
 
     if save_path:
         with open(save_path, 'w') as f:

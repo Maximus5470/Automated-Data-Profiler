@@ -23,15 +23,12 @@ manifest_path = results_dir / "manifest.json"
 
 
 def load_analysis_manifest() -> dict:
-    if not manifest_path.exists():
-        return {}
-
+    if not manifest_path.exists(): return {}
     try:
         with open(manifest_path, "r", encoding="utf-8") as f:
-            manifest = json.load(f)
-        return manifest if isinstance(manifest, dict) else {}
-    except Exception:
-        return {}
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except: return {}
 
 
 def save_analysis_manifest(manifest: dict) -> None:
@@ -106,7 +103,7 @@ async def upload_file(files: List[UploadFile] = File(...)):
                 pass
 
     status_code = 200 if not errors else 207
-    return JSONResponse(status_code=status_code, content={"status": "partial" if errors else "success", "processed": results, "errors": errors, "file_id": first_file_id})
+    return {"status": "partial" if errors else "success", "processed": results, "errors": errors, "file_id": first_file_id}
 
 @app.get("/download-json/{file_id}")
 async def download_json(file_id: str):
@@ -196,10 +193,6 @@ async def dashboard():
         return RedirectResponse(url=f"/analysis/{analyses[0]}")
     return RedirectResponse(url="/")
 
-@app.post("/refresh/{file_id}")
-async def refresh_profile(file_id: str):
-    """Regenerate the profile data (requires original file if implementing properly)"""
-    return {"status": "error", "message": "Not implemented for dynamic routing"}
 
 if __name__ == "__main__":
     import uvicorn
