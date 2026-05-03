@@ -19,6 +19,24 @@ uploads_dir.mkdir(exist_ok=True)
 
 results_dir = Path(__file__).parent / "results"
 results_dir.mkdir(exist_ok=True)
+manifest_path = results_dir / "manifest.json"
+
+
+def load_analysis_manifest() -> dict:
+    if not manifest_path.exists():
+        return {}
+
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+        return manifest if isinstance(manifest, dict) else {}
+    except Exception:
+        return {}
+
+
+def save_analysis_manifest(manifest: dict) -> None:
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=4)
 
 def validate_file_id(file_id: str) -> str:
     """Validate that file_id contains only safe characters and no path traversal."""
@@ -45,6 +63,7 @@ async def upload_file(files: List[UploadFile] = File(...)):
     results = []
     errors = []
     first_file_id = None
+    manifest = load_analysis_manifest()
 
     for file in files:
         unique_suffix = str(uuid.uuid4())[:8]
@@ -70,6 +89,9 @@ async def upload_file(files: List[UploadFile] = File(...)):
                 raise ValueError("Invalid result path")
             
             data_profiler.generate_profile(str(temp_path), str(result_path))
+
+            manifest[file_id] = file.filename
+            save_analysis_manifest(manifest)
 
             results.append({"file": file.filename, "file_id": file_id, "result": str(result_path)})
 
@@ -124,8 +146,18 @@ async def view_analysis(file_id: str):
     
     with open(result_path, 'r') as f:
         profile_data = json.load(f)
-        
-    analyses = [f.stem for f in results_dir.glob("*.json")]
+
+    manifest = load_analysis_manifest()
+    analyses = []
+    for result_file in sorted(results_dir.glob("*.json")):
+        if result_file.name == manifest_path.name:
+            continue
+
+        file_id = result_file.stem
+        analyses.append({
+            "id": file_id,
+            "label": manifest.get(file_id, file_id),
+        })
     
     template = env.get_template('dashboard.html')
     html_content = template.render(data=profile_data, current_file=validated_id, analyses=analyses)
@@ -148,6 +180,10 @@ async def delete_analysis(file_id: str):
     
     try:
         result_path.unlink()
+        manifest = load_analysis_manifest()
+        if validated_id in manifest:
+            manifest.pop(validated_id, None)
+            save_analysis_manifest(manifest)
         return {"status": "success", "message": f"Analysis {validated_id} deleted"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not delete analysis: {str(e)}")
@@ -155,7 +191,7 @@ async def delete_analysis(file_id: str):
 @app.get("/dashboard", response_class=RedirectResponse)
 async def dashboard():
     """Redirect to the first available analysis or upload page"""
-    analyses = [f.stem for f in results_dir.glob("*.json")]
+    analyses = [f.stem for f in results_dir.glob("*.json") if f.name != manifest_path.name]
     if analyses:
         return RedirectResponse(url=f"/analysis/{analyses[0]}")
     return RedirectResponse(url="/")
