@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DataProfile AI - Upload</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+tailwind.config = {
+    darkMode: "class",
+    theme: {
+        extend: {
+            colors: {
+                "surface-variant": "#d3e4fe", "on-secondary-fixed": "#001e2f", "surface-container-highest": "#d3e4fe",
+                "inverse-surface": "#213145", "error": "#ba1a1a", "inverse-on-surface": "#eaf1ff", "surface-tint": "#4e44e2",
+                "on-primary-fixed": "#0f0069", "primary": "#3e32d3", "on-surface-variant": "#464555", "on-tertiary-fixed": "#341100",
+                "primary-fixed-dim": "#c3c0ff", "primary-fixed": "#e2dfff", "on-tertiary": "#ffffff", "on-surface": "#0b1c30",
+                "on-secondary": "#ffffff", "secondary-fixed-dim": "#89ceff", "tertiary-container": "#ae4a00", "background": "#f8f9ff",
+                "secondary-container": "#39b8fd", "outline": "#777587", "on-primary-fixed-variant": "#3424ca", "on-background": "#0b1c30",
+                "on-tertiary-fixed-variant": "#793100", "tertiary-fixed": "#ffdbcb", "surface-container-high": "#dce9ff",
+                "on-tertiary-container": "#ffe3d6", "outline-variant": "#c7c4d8", "inverse-primary": "#c3c0ff", "on-error": "#ffffff",
+                "surface-container-lowest": "#ffffff", "secondary": "#006591", "on-error-container": "#93000a", "surface-container": "#e5eeff",
+                "surface-container-low": "#eff4ff", "error-container": "#ffdad6", "surface-dim": "#cbdbf5", "tertiary-fixed-dim": "#ffb691",
+                "tertiary": "#883800", "surface-bright": "#f8f9ff", "primary-container": "#5850ec", "on-secondary-container": "#004666",
+                "on-primary-container": "#e9e5ff", "on-secondary-fixed-variant": "#004c6e", "surface": "#f8f9ff", "secondary-fixed": "#c9e6ff",
+                "on-primary": "#ffffff"
+            },
+            fontFamily: {
+                "mono-data": ["monospace"], "display-lg": ["Inter"], "body-lg": ["Inter"], "headline-lg": ["Inter"],
+                "label-md": ["Inter"], "headline-md": ["Inter"], "body-md": ["Inter"], "body-sm": ["Inter"]
+            }
+        }
+    }
+}
+</script>
+<style>
+.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+.custom-dashed-border {
+    background-image: url("data:image/svg+xml,%3csvg width='100%25' height='100%25' xmlns='http://www.w3.org/2000/svg'%3e%3crect width='100%25' height='100%25' fill='none' rx='8' ry='8' stroke='%23C7C4D8' stroke-width='2' stroke-dasharray='8%2c 8' stroke-dashoffset='0' stroke-linecap='square'/%3e%3c/svg%3e");
+    border-radius: 8px;
+}
+body { min-height: 100dvh; }
+</style>
+</head>
+<body class="bg-surface font-body-md text-on-background min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<header class="fixed top-0 z-50 w-full flex items-center justify-between px-6 h-16 bg-white shadow-sm border-b border-gray-100">
+    <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-indigo-600" data-icon="analytics">analytics</span>
+        <h1 class="text-lg font-bold tracking-tight text-gray-900">DataProfile AI</h1>
+    </div>
+</header>
+<!-- Main Canvas -->
+<main class="flex-grow flex items-center justify-center p-6 mt-16">
+    <form id="uploadForm" enctype="multipart/form-data" class="w-full max-w-md flex flex-col gap-6">
+        <div class="text-center space-y-2">
+            <h2 class="text-3xl font-semibold text-on-surface">Import Data</h2>
+            <p class="text-on-surface-variant max-w-[280px] mx-auto">Upload your CSV dataset to start the profiling process.</p>
+        </div>
+        <div id="uploadArea" class="bg-white custom-dashed-border p-8 flex flex-col items-center justify-center text-center space-y-6 min-h-[320px] cursor-pointer hover:bg-surface-container transition-colors">
+            <input type="file" id="fileInput" accept=".csv" name="file" class="hidden">
+            <div class="w-16 h-16 rounded-full bg-primary-fixed flex items-center justify-center pointer-events-none">
+                <span class="material-symbols-outlined text-primary text-4xl" data-icon="cloud_upload">cloud_upload</span>
+            </div>
+            <div class="space-y-1 pointer-events-none">
+                <p class="text-xl font-semibold text-on-surface">Drag and drop your file here</p>
+                <p class="text-sm text-on-surface-variant">Max file size: 50MB</p>
+            </div>
+            <div id="selectedFile" class="hidden text-sm text-primary font-medium mt-2 pointer-events-none">Selected: <span id="fileName"></span></div>
+            <div id="loading" class="hidden text-sm text-primary font-medium mt-2 pointer-events-none">Processing your file...</div>
+            <button type="submit" id="submitBtn" class="bg-primary-container text-white px-8 py-3 rounded-lg font-bold uppercase tracking-widest active:scale-[0.98] transition-transform hover:bg-primary duration-150">
+                Browse Files
+            </button>
+            <div class="flex items-center gap-2 pt-2 pointer-events-none">
+                <span class="material-symbols-outlined text-primary text-base" data-icon="description">description</span>
+                <span class="text-xs font-semibold text-on-surface-variant">Accepted format: .csv</span>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+            <div class="bg-white border border-gray-200 p-4 rounded-lg flex flex-col gap-1">
+                <span class="material-symbols-outlined text-secondary" data-icon="security">security</span>
+                <span class="text-xs font-semibold text-on-surface uppercase">Secure</span>
+                <p class="text-sm text-on-surface-variant leading-tight">Encrypted at rest</p>
+            </div>
+            <div class="bg-white border border-gray-200 p-4 rounded-lg flex flex-col gap-1">
+                <span class="material-symbols-outlined text-tertiary" data-icon="bolt">bolt</span>
+                <span class="text-xs font-semibold text-on-surface uppercase">Fast</span>
+                <p class="text-sm text-on-surface-variant leading-tight">Instant indexing</p>
+            </div>
+        </div>
+    </form>
+</main>
+<script>
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('fileInput');
+    const selectedFile = document.getElementById('selectedFile');
+    const fileName = document.getElementById('fileName');
+    const uploadForm = document.getElementById('uploadForm');
+    const loading = document.getElementById('loading');
+    const submitBtn = document.getElementById('submitBtn');
+
+    submitBtn.addEventListener('click', (e) => {
+        // Prevent click from bubbling to uploadArea
+        e.stopPropagation();
+        if (fileInput.files.length === 0) {
+            e.preventDefault();
+            fileInput.click();
+        }
+    });
+
+    uploadArea.addEventListener('click', (e) => {
+        if (!submitBtn.contains(e.target)) {
+            fileInput.click();
+        }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            fileName.textContent = e.target.files[0].name;
+            selectedFile.classList.remove('hidden');
+            submitBtn.textContent = 'Analyze Dataset';
+        }
+    });
+
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('bg-surface-container');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+        uploadArea.classList.remove('bg-surface-container');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('bg-surface-container');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            fileName.textContent = files[0].name;
+            selectedFile.classList.remove('hidden');
+            submitBtn.textContent = 'Analyze Dataset';
+        }
+    });
+
+    uploadForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (fileInput.files.length === 0) {
+            fileInput.click();
+            return;
+        }
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        loading.classList.remove('hidden');
+        submitBtn.disabled = true;
+
+        try {
+            const response = await fetch('/upload', { method: 'POST', body: formData });
+            if (response.ok) {
+                const html = await response.text();
+                document.open();
+                document.write(html);
+                document.close();
+            } else {
+                alert('Error uploading file. Please try again.');
+                loading.classList.add('hidden');
+                submitBtn.disabled = false;
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+            loading.classList.add('hidden');
+            submitBtn.disabled = false;
+        }
+    });
+</script>
+</body>
+</html>

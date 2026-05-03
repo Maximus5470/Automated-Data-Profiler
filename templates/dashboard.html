@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DataProfile AI - Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+tailwind.config = {
+    darkMode: "class",
+    theme: {
+        extend: {
+            colors: {
+                "primary-container": "#5850ec", "primary": "#3e32d3", "on-surface": "#0b1c30",
+                "error": "#ba1a1a", "secondary-container": "#39b8fd", "on-primary": "#ffffff",
+                "surface-container": "#e5eeff", "surface": "#f8f9ff", "background": "#f8f9ff",
+                "surface-variant": "#d3e4fe", "surface-container-low": "#eff4ff"
+            },
+            fontFamily: { "sans": ["Inter", "sans-serif"] }
+        }
+    }
+}
+</script>
+<style>
+    body { font-family: 'Inter', sans-serif; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    .tonal-card { background: #ffffff; border: 1px solid #f1f5f9; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.04); }
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+</style>
+</head>
+<body class="bg-surface text-on-surface flex h-screen overflow-hidden">
+<!-- Sidebar -->
+<aside id="sidebar" class="w-64 flex-shrink-0 bg-white border-r border-gray-100 flex flex-col overflow-hidden transition-[width] duration-300 z-40">
+    <div class="min-h-16 flex items-center px-6 py-4 border-b border-gray-100 overflow-hidden shrink-0">
+        <div class="flex items-center gap-3 whitespace-nowrap">
+            <span class="material-symbols-outlined text-indigo-600 flex-shrink-0" data-icon="analytics">analytics</span>
+            <span class="text-lg font-bold tracking-tight text-gray-900 sidebar-text">ProfileEngine</span>
+        </div>
+    </div>
+    <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto overflow-x-hidden">
+        <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4 px-2 sidebar-text">Current Analysis</p>
+        <a href="#" class="sidebar-nav-link flex items-center gap-3 px-4 py-3 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors w-full" title="Analysis">
+            <span class="material-symbols-outlined flex-shrink-0">dashboard</span>
+            <span class="font-semibold whitespace-nowrap sidebar-text">Analysis</span>
+        </a>
+    </nav>
+</aside>
+
+<div class="flex-1 flex flex-col h-screen overflow-y-auto relative">
+<!-- TopNavBar -->
+<header class="sticky top-0 z-50 w-full flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 bg-white/90 backdrop-blur shadow-sm border-b border-gray-100 antialiased text-sm font-medium">
+    <div class="flex items-center gap-3">
+        <button id="toggleSidebarBtn" class="p-2 -ml-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 rounded-lg transition-colors flex items-center justify-center">
+            <span class="material-symbols-outlined">menu_open</span>
+        </button>
+        <h1 class="text-lg font-bold tracking-tight text-gray-900 hidden sm:block">DataProfile AI</h1>
+    </div>
+    <div class="flex items-center gap-4">
+        <a href="/" class="px-4 py-2 bg-primary-container text-white rounded-lg hover:bg-primary transition-colors flex items-center gap-2 shadow-sm">
+            <span class="material-symbols-outlined text-sm">upload</span> New Analysis
+        </a>
+        <a href="/download-json" class="px-4 py-2 border border-gray-200 bg-white rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 shadow-sm">
+            <span class="material-symbols-outlined text-sm text-gray-600">download</span> JSON
+        </a>
+    </div>
+</header>
+
+<!-- Main Content Canvas -->
+<main class="py-8 pb-12">
+    <div class="max-w-[1440px] mx-auto px-4 sm:px-6 space-y-8">
+        
+        <!-- Dashboard Header Section -->
+        <section class="flex flex-col justify-between items-start gap-2">
+            <p class="text-xs font-semibold text-primary tracking-widest uppercase">Project Overview</p>
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Dataset Analysis</h1>
+        </section>
+
+        <!-- Summary Bento Grid -->
+        <section class="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div class="tonal-card p-5 rounded-xl flex flex-col justify-between h-32">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Columns</span>
+                    <span class="material-symbols-outlined text-primary-container text-sm">view_column</span>
+                </div>
+                <p class="text-3xl font-bold">{{ data['Number of Columns'] }}</p>
+            </div>
+            <div class="tonal-card p-5 rounded-xl flex flex-col justify-between h-32">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Rows</span>
+                    <span class="material-symbols-outlined text-primary-container text-sm">table_rows</span>
+                </div>
+                <p class="text-3xl font-bold">{{ data['Number of Rows'] }}</p>
+            </div>
+            <div class="tonal-card p-5 rounded-xl flex flex-col justify-between h-32">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Duplicates</span>
+                    <span class="material-symbols-outlined text-primary-container text-sm">content_copy</span>
+                </div>
+                <p class="text-3xl font-bold">{{ data['Duplicate Rows'] }}</p>
+            </div>
+            <div class="tonal-card p-5 rounded-xl flex flex-col justify-between h-32">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Missing</span>
+                    <span class="material-symbols-outlined text-primary-container text-sm">block</span>
+                </div>
+                <p class="text-3xl font-bold">{{ data['Missing Values'] }}</p>
+            </div>
+            <div class="tonal-card p-5 rounded-xl flex flex-col justify-between h-32 col-span-2 md:col-span-1">
+                <div class="flex justify-between items-start">
+                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Size</span>
+                    <span class="material-symbols-outlined text-primary-container text-sm">storage</span>
+                </div>
+                <p class="text-3xl font-bold">{{ data['Dataset Size'] }}</p>
+            </div>
+        </section>
+
+        <!-- Detailed Profiling Table with Expandable Rows -->
+        <section class="space-y-4">
+            <div>
+                <h3 class="text-xl md:text-2xl font-bold text-on-surface">Detailed Column Profiling</h3>
+                <p class="text-sm text-gray-500">Comprehensive metrics for each field in the dataset. Click to expand.</p>
+            </div>
+            
+            <div class="grid grid-cols-1 gap-3 mt-4">
+                {% for column, profile in data['column_profiling'].items() %}
+                <details class="tonal-card rounded-xl group overflow-hidden bg-white">
+                    <summary class="p-4 sm:p-5 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors list-none border-l-4 border-transparent hover:border-primary-container">
+                        <div class="flex items-center gap-4 w-1/2 md:w-1/3">
+                            <span class="material-symbols-outlined text-primary-container">data_object</span>
+                            <span class="font-mono font-semibold text-base md:text-lg text-gray-900 truncate">{{ column }}</span>
+                        </div>
+                        <div class="w-1/4 hidden sm:block">
+                            <span class="px-3 py-1 bg-surface-variant text-primary text-[10px] font-bold uppercase rounded-full tracking-wider">{{ profile['Type'] }}</span>
+                        </div>
+                        <div class="w-1/4 text-sm text-gray-500 hidden md:block">
+                            Missing: <span class="font-semibold text-gray-700">{{ profile['Missing %'] }}</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm font-semibold text-gray-700">{{ profile.get('Unique Values', 'N/A') }} <span class="font-normal text-gray-500 text-xs hidden sm:inline">unique</span></span>
+                            <span class="material-symbols-outlined text-gray-400 group-open:rotate-180 transition-transform">expand_more</span>
+                        </div>
+                    </summary>
+                    <div class="p-4 sm:p-6 border-t border-gray-100 bg-gray-50/50">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                            
+                            <!-- Basic Stats -->
+                            <div class="space-y-3">
+                                <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-200 pb-1">Stats</h4>
+                                <ul class="text-sm space-y-2 text-gray-600">
+                                    <li class="flex justify-between"><span class="font-semibold text-gray-900">Type:</span> <span>{{ profile['Type'] }}</span></li>
+                                    <li class="flex justify-between"><span class="font-semibold text-gray-900">Missing:</span> <span>{{ profile['Missing %'] }}</span></li>
+                                    <li class="flex justify-between"><span class="font-semibold text-gray-900">Unique:</span> <span>{{ profile.get('Unique Values', 'N/A') }}</span></li>
+                                    {% if profile.get('Cardinality') %}<li class="flex justify-between"><span class="font-semibold text-gray-900">Cardinality:</span> <span>{{ profile['Cardinality'] }}</span></li>{% endif %}
+                                    {% if profile.get('Balanced Column') %}<li class="flex justify-between"><span class="font-semibold text-gray-900">Balanced:</span> <span>{{ profile['Balanced Column'] }}</span></li>{% endif %}
+                                </ul>
+                            </div>
+                            
+                            <!-- Numerical Stats -->
+                            {% if profile.get('Type') in ['integer', 'floating', 'mixed-integer'] and profile.get('Min') is not none %}
+                            <div class="space-y-3">
+                                <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-200 pb-1">Distribution</h4>
+                                <ul class="text-sm space-y-2 text-gray-600">
+                                    <li class="flex justify-between"><span class="font-semibold text-gray-900">Min:</span> <span>{{ profile.get('Min') }}</span></li>
+                                    <li class="flex justify-between"><span class="font-semibold text-gray-900">Max:</span> <span>{{ profile.get('Max') }}</span></li>
+                                    {% if profile.get('Mean') is not none %}
+                                    <li class="flex justify-between"><span class="font-semibold text-gray-900">Mean:</span> <span>{{ "%.2f"|format(profile.get('Mean')) }}</span></li>
+                                    <li class="flex justify-between"><span class="font-semibold text-gray-900">Std:</span> <span>{{ "%.2f"|format(profile.get('Std')) }}</span></li>
+                                    {% endif %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Top Values -->
+                            {% if profile.get('Top Values') %}
+                            <div class="space-y-3">
+                                <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-200 pb-1">Top Values</h4>
+                                <ul class="text-sm space-y-2 text-gray-600">
+                                    {% for val, pct in profile['Top Values'].items() %}
+                                    <li class="flex justify-between items-center gap-2">
+                                        <span class="truncate font-medium text-gray-800" title="{{ val }}">{{ val }}</span>
+                                        <span class="text-[10px] font-bold bg-gray-200 px-1.5 py-0.5 rounded text-gray-700 whitespace-nowrap">{{ pct }}</span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Composition -->
+                            {% if profile.get('Composition') %}
+                            <div class="space-y-3">
+                                <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-200 pb-1">Data Types</h4>
+                                <ul class="text-sm space-y-2 text-gray-600">
+                                    {% for t, pct in profile['Composition'].items() %}
+                                    <li class="flex justify-between items-center gap-2">
+                                        <span class="capitalize font-medium">{{ t }}</span>
+                                        <span class="text-[10px] font-bold bg-gray-200 px-1.5 py-0.5 rounded text-gray-700">{{ pct }}</span>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Functional Dependencies -->
+                            {% if profile.get('Functional Dependencies') and profile.get('Functional Dependencies') != "No strong dependencies" %}
+                            <div class="space-y-2 col-span-1 sm:col-span-2 lg:col-span-4 mt-2 bg-white p-4 rounded-lg border border-gray-100">
+                                <h4 class="text-[10px] font-bold text-primary uppercase tracking-wider flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">link</span> Functional Dependencies</h4>
+                                <p class="text-sm text-gray-700 leading-relaxed font-mono mt-1">{{ profile['Functional Dependencies'] }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </details>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- Cross Column Correlation Matrix -->
+        {% if data.get('cross_column_profiling') %}
+        <section class="tonal-card rounded-xl overflow-hidden mt-8">
+            <div class="p-6 border-b border-gray-100 bg-white">
+                <h3 class="text-xl md:text-2xl font-bold text-on-surface">Cross-Column Correlation Matrix</h3>
+                <p class="text-sm text-gray-500 mt-1">Pearson correlation between numerical features.</p>
+            </div>
+            <div class="overflow-x-auto p-4 sm:p-6 bg-white">
+                <table class="w-full text-center text-[10px] sm:text-xs border-collapse">
+                    <thead>
+                        <tr>
+                            <th class="p-2 border border-gray-100 bg-gray-50 sticky left-0 z-10"></th>
+                            {% for col in data['cross_column_profiling'].keys() %}
+                                <th class="p-2 border border-gray-100 bg-gray-50 font-semibold text-gray-600 whitespace-nowrap min-w-[60px]">{{ col }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for col1, correlations in data['cross_column_profiling'].items() %}
+                        <tr>
+                            <th class="p-2 border border-gray-100 bg-gray-50 font-semibold text-left text-gray-700 whitespace-nowrap sticky left-0 z-10">{{ col1 }}</th>
+                            {% for col2, value in correlations.items() %}
+                                {% set val_str = value | string | lower %}
+                                <td class="p-2 border border-white font-mono transition-colors hover:opacity-80" style="
+                                    {% if val_str == 'nan' %}background-color: #f8fafc; color: #cbd5e1;
+                                    {% elif value >= 0.7 %}background-color: #dcfce7; color: #166534; font-weight: 700;
+                                    {% elif value >= 0.3 %}background-color: #fef9c3; color: #854d0e; font-weight: 600;
+                                    {% elif value >= -0.3 %}background-color: #f1f5f9; color: #475569;
+                                    {% else %}background-color: #fee2e2; color: #991b1b; font-weight: 600;{% endif %}
+                                " title="{{ col1 }} x {{ col2 }}: {% if val_str == 'nan' %}NaN{% else %}{{ value }}{% endif %}">
+                                    {% if val_str == 'nan' %}NaN{% else %}{{ "%.2f"|format(value) }}{% endif %}
+                                </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        {% endif %}
+
+    </div>
+</main>
+</div>
+
+<script>
+    const sidebar = document.getElementById('sidebar');
+    const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+    const toggleIcon = toggleSidebarBtn.querySelector('span');
+    const sidebarTexts = document.querySelectorAll('.sidebar-text');
+    const sidebarNavLinks = document.querySelectorAll('.sidebar-nav-link');
+
+    let isCollapsed = false;
+
+    toggleSidebarBtn.addEventListener('click', () => {
+        isCollapsed = !isCollapsed;
+        
+        if (isCollapsed) {
+            sidebar.classList.remove('w-64');
+            sidebar.classList.add('w-20');
+            sidebar.classList.add('sidebar-collapsed');
+            toggleIcon.textContent = 'menu';
+            sidebarTexts.forEach(el => el.classList.add('opacity-0', 'invisible', 'w-0'));
+            sidebarNavLinks.forEach(link => link.classList.add('justify-center', 'px-3', 'gap-0'));
+        } else {
+            sidebar.classList.remove('w-20');
+            sidebar.classList.add('w-64');
+            sidebar.classList.remove('sidebar-collapsed');
+            toggleIcon.textContent = 'menu_open';
+            sidebarTexts.forEach(el => el.classList.remove('opacity-0', 'invisible', 'w-0'));
+            sidebarNavLinks.forEach(link => link.classList.remove('justify-center', 'px-3', 'gap-0'));
+        }
+    });
+</script>
+
+<style>
+/* Smooth fade for text elements in sidebar */
+.sidebar-text {
+    transition: opacity 0.2s ease, visibility 0.2s ease, width 0.3s ease;
+}
+
+.sidebar-collapsed .sidebar-text {
+    width: 0;
+    margin: 0;
+    overflow: hidden;
+}
+
+.sidebar-collapsed .sidebar-nav-link {
+    justify-content: center;
+}
+
+.sidebar-collapsed nav > p {
+    display: none;
+}
+</style>
+</body></html>

@@ -18,6 +18,11 @@ def get_numerical_column_features(col):
     """
     features = {}
     features['dtype'] = pd.api.types.infer_dtype(col)
+    if 'mixed' in features['dtype']:
+        type_counts = col.dropna().map(type).value_counts()
+        type_percents = type_counts / len(col.dropna()) * 100
+        features['composition'] = {t.__name__: f"{c} ({p:.2f}%)" for t, c, p in zip(type_counts.index, type_counts, type_percents)}
+
     missing_count = col.isnull().sum()
     missing_percent = col.isnull().mean() * 100
     features['missing_percent'] = list((missing_count, missing_percent))
@@ -25,8 +30,8 @@ def get_numerical_column_features(col):
     features['min_value'] = col.min()
     features['max_value'] = col.max()
     if pd.api.types.is_numeric_dtype(col):
-        features['mean_value'] = col.mean()
-        features['std_value'] = col.std()
+        features['mean_value'] = round(col.mean(), 2)
+        features['std_value'] = round(col.std(), 2)
     
     return features
 
@@ -51,12 +56,17 @@ def get_categorical_column_features(col):
     """
     features = {}
     features['dtype'] = pd.api.types.infer_dtype(col)
+    if 'mixed' in features['dtype']:
+        type_counts = col.dropna().map(type).value_counts()
+        type_percents = type_counts / len(col.dropna()) * 100
+        features['composition'] = {t.__name__: f"{c} ({p:.2f}%)" for t, c, p in zip(type_counts.index, type_counts, type_percents)}
+
     missing_count = col.isnull().sum()
     missing_percent = col.isnull().mean() * 100
     features['missing_percent'] = list((missing_count, missing_percent))
     features['num_unique'] = col.nunique()
     
-    top_values = col.value_counts().nlargest(5)
+    top_values = col.value_counts()
     top_percents = col.value_counts(normalize=True) * 100
     features['top_values'] = list(zip(top_values.index, top_values, top_percents))
     features['balanced'] = not (top_percents.max() > 70)
