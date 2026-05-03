@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from jinja2 import Environment, FileSystemLoader
 import json
 from pathlib import Path
+import tempfile
 import main as data_profiler
 import uuid
 import re
@@ -11,14 +12,23 @@ import re
 app = FastAPI(title="Data Profiling Dashboard")
 
 template_dir = Path(__file__).parent / "templates"
-template_dir.mkdir(exist_ok=True)
 env = Environment(loader=FileSystemLoader(template_dir))
 
-uploads_dir = Path(__file__).parent / "uploads"
-uploads_dir.mkdir(exist_ok=True)
+def resolve_runtime_dir(name: str) -> Path:
+    preferred_dir = Path(__file__).parent / name
+    try:
+        preferred_dir.mkdir(parents=True, exist_ok=True)
+        probe_file = preferred_dir / ".write_test"
+        probe_file.write_text("ok", encoding="utf-8")
+        probe_file.unlink()
+        return preferred_dir
+    except OSError:
+        fallback_dir = Path(tempfile.gettempdir()) / "data_profiling" / name
+        fallback_dir.mkdir(parents=True, exist_ok=True)
+        return fallback_dir
 
-results_dir = Path(__file__).parent / "results"
-results_dir.mkdir(exist_ok=True)
+uploads_dir = resolve_runtime_dir("uploads")
+results_dir = resolve_runtime_dir("results")
 manifest_path = results_dir / "manifest.json"
 
 
