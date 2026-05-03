@@ -24,10 +24,12 @@ def get_numerical_column_features(col):
     features['num_unique'] = col.nunique()
     features['min_value'] = col.min()
     features['max_value'] = col.max()
-    features['mean_value'] = col.mean()
-    features['std_value'] = col.std()
+    if pd.api.types.is_numeric_dtype(col):
+        features['mean_value'] = col.mean()
+        features['std_value'] = col.std()
     
     return features
+
 
 def get_categorical_column_features(col):
     """
@@ -45,7 +47,6 @@ def get_categorical_column_features(col):
         <entity5>    : <value5> (<percent>%)
     Balanced Column  : <Yes/No>
     Cardinality       : <High/Medium/Low>
-
     ========================================
     """
     features = {}
@@ -60,10 +61,12 @@ def get_categorical_column_features(col):
     features['top_values'] = list(zip(top_values.index, top_values, top_percents))
     features['balanced'] = not (top_percents.max() > 70)
     features['cardinality'] = 'High' if features['num_unique'] > 10 else 'Medium' if features['num_unique'] > 3 else 'Low'
+    features['fd_analysis'] = []
+
     return features
 
 NULL_STRINGS = {'', 'nan', 'none', 'null', 'na', 'n/a', '#n/a', 'missing'}
-DATE_RE = re.compile(r'^\d{4}[-/]\d{1,2}[-/]\d{1,2}|^\d{1,2}[-/]\d{1,2}[-/]\d{4}')
+DATE_RE = re.compile(r'^\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[ T]\d{1,2}:\d{1,2}:\d{1,2})?|^\d{1,2}[-/]\d{1,2}[-/]\d{4}(?:[ T]\d{1,2}:\d{1,2}:\d{1,2})?')
 
 def infer_cell_type(val):
     if not isinstance(val, str):
@@ -84,7 +87,23 @@ def infer_cell_type(val):
     if DATE_RE.match(s):
         try:
             p = pd.to_datetime(s, errors='raise')
-            return p.to_pydatetime() if (p.hour or p.minute or p.second) else p.date()
+            return p.to_pydatetime()
         except: pass
 
     return s.strip("'\"")
+
+def functional_dependency_analysis(df, col1, col2):
+    """
+    Analyze functional dependency between two columns.
+    Returns a dictionary with the results.
+    """
+    dependency = {}
+    grouped = df.groupby(col1)[col2].nunique()
+    total_groups = len(grouped)
+    unique_values = grouped.nunique()
+    
+    dependency['total_groups'] = total_groups
+    dependency['unique_values'] = unique_values
+    dependency['dependency_ratio'] = unique_values / total_groups if total_groups > 0 else 0
+    
+    return dependency
