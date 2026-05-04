@@ -68,7 +68,7 @@ def load_data(source_path: str, source_type: str | None = None, **kwargs) -> pd.
     raise ValueError(f"Unsupported source type: {source_type}")
 
 
-def generate_profile(source_path='data/Autism_Data.csv', save_path='result.json', source_type: str | None = None, df: pd.DataFrame | None = None, **kwargs):
+def generate_profile(source_path='data/Autism_Data.csv', save_path='results/result.json', source_type: str | None = None, df: pd.DataFrame | None = None, **kwargs):
     if df is None:
         df = load_data(source_path, source_type=source_type, **kwargs)
     else:
@@ -134,8 +134,19 @@ def generate_profile(source_path='data/Autism_Data.csv', save_path='result.json'
     results['cross_column_profiling'] = df[numerical_columns].corr().to_dict()
 
     if save_path:
-        with open(save_path, 'w') as f:
-            json.dump(results, f, indent=4, cls=NpEncoder)
+        save_path = Path(save_path)
+        # Ensure parent directory exists when a nested path is provided
+        if save_path.parent and not save_path.parent.exists():
+            try:
+                save_path.parent.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                # If we cannot create the directory, we'll attempt to write and raise a clear error on failure
+                pass
+        try:
+            with open(save_path, 'w') as f:
+                json.dump(results, f, indent=4, cls=NpEncoder)
+        except OSError as exc:
+            raise OSError(f"Unable to write results to {save_path}: {exc}") from exc
             
     return results
 
