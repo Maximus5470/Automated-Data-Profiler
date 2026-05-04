@@ -210,7 +210,7 @@ async def upload_mongodb_atlas(
             database=mongo_database,
             collection=mongo_collection,
         )
-        profile_data = data_profiler.generate_profile(df=df)
+        profile_data = data_profiler.generate_profile(df=df, save_path=None)
         result_path = persist_analysis_result(
             session_id=session_id,
             file_id=file_id,
