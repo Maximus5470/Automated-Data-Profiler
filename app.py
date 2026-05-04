@@ -1,6 +1,7 @@
 from typing import List
-from fastapi import FastAPI, HTTPException, UploadFile, File, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
 import json
 from pathlib import Path
@@ -10,6 +11,7 @@ import uuid
 import re
 
 app = FastAPI(title="Data Profiling Dashboard")
+app.mount("/static", StaticFiles(directory=Path(__file__).parent, html=False), name="static")
 SESSION_COOKIE_NAME = "dataprofiling_session"
 SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 
@@ -76,6 +78,21 @@ def get_results_dir(session_id: str) -> Path:
     return results_path
 
 
+def persist_analysis_result(session_id: str, file_id: str, profile_data: dict, display_name: str) -> Path:
+    results_dir = get_results_dir(session_id)
+    result_path = results_dir / f"{file_id}.json"
+    if not str(result_path.resolve()).startswith(str(results_dir.resolve())):
+        raise ValueError("Invalid result path")
+
+    with open(result_path, "w", encoding="utf-8") as f:
+        json.dump(profile_data, f, indent=4, cls=data_profiler.NpEncoder)
+
+    manifest = load_analysis_manifest(session_id)
+    manifest[file_id] = display_name
+    save_analysis_manifest(session_id, manifest)
+    return result_path
+
+
 def get_manifest_path(session_id: str) -> Path:
     return get_session_root(session_id) / "manifest.json"
 
@@ -134,7 +151,11 @@ async def upload_file(request: Request, files: List[UploadFile] = File(...)):
         if not first_file_id:
             first_file_id = file_id
         
-        temp_path = uploads_dir / f"temp_{file_id}.csv"
+        extension = Path(file.filename).suffix.lower() or '.csv'
+        if extension not in {'.csv', '.json', '.ndjson'}:
+            raise ValueError(f"Unsupported upload file type: {extension}")
+
+        temp_path = uploads_dir / f"temp_{file_id}{extension}"
 
         try:
             if not str(temp_path.resolve()).startswith(str(uploads_dir.resolve())):
@@ -147,8 +168,8 @@ async def upload_file(request: Request, files: List[UploadFile] = File(...)):
             result_path = results_dir / f"{file_id}.json"
             if not str(result_path.resolve()).startswith(str(results_dir.resolve())):
                 raise ValueError("Invalid result path")
-            
-            data_profiler.generate_profile(str(temp_path), str(result_path))
+
+            data_profiler.generate_profile(source_path=str(temp_path), save_path=str(result_path))
 
             manifest[file_id] = file.filename
             save_analysis_manifest(session_id, manifest)
@@ -166,7 +187,44 @@ async def upload_file(request: Request, files: List[UploadFile] = File(...)):
                 pass
 
     status_code = 200 if not errors else 207
-    return {"status": "partial" if errors else "success", "processed": results, "errors": errors, "file_id": first_file_id}
+    return {status_code: status_code, "status": "partial" if errors else "success", "processed": results, "errors": errors, "file_id": first_file_id}
+
+
+@app.post("/mongo-upload")
+async def upload_mongodb_atlas(
+    request: Request,
+    mongo_uri: str = Form(...),
+    mongo_database: str = Form(...),
+    mongo_collection: str = Form(...),
+):
+    """Connect to MongoDB Atlas, profile the selected collection, and persist the report."""
+    session_id = request.state.session_id
+    safe_database = sanitize_filename(mongo_database)
+    safe_collection = sanitize_filename(mongo_collection)
+    file_id = f"mongo_{safe_database}_{safe_collection}_{uuid.uuid4().hex[:8]}"
+    validate_file_id(file_id)
+
+    try:
+        df = data_profiler.load_mongodb_atlas(
+            uri=mongo_uri,
+            database=mongo_database,
+            collection=mongo_collection,
+        )
+        profile_data = data_profiler.generate_profile(df=df)
+        result_path = persist_analysis_result(
+            session_id=session_id,
+            file_id=file_id,
+            profile_data=profile_data,
+            display_name=f"{mongo_database}.{mongo_collection}",
+        )
+        return {
+            "status": "success",
+            "file": f"{mongo_database}.{mongo_collection}",
+            "file_id": file_id,
+            "result": str(result_path),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not profile MongoDB Atlas collection: {str(e)}")
 
 @app.get("/download-json/{file_id}")
 async def download_json(request: Request, file_id: str):

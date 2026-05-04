@@ -2,16 +2,77 @@ import pandas as pd
 import utils
 import json
 import numpy as np
+from pathlib import Path
+from datetime import date, datetime
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, (np.integer, np.floating)): return obj.item()
         if isinstance(obj, np.ndarray): return obj.tolist()
+        if isinstance(obj, pd.Timestamp): return obj.isoformat()
+        if isinstance(obj, (datetime, date)): return obj.isoformat()
         return super().default(obj)
 
-def generate_profile(csv_path='data/Autism_Data.csv', save_path='result.json'):
-    df = pd.read_csv(csv_path, dtype=object)
+
+def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.astype(object, copy=False)
     df = df.apply(lambda col: col.map(utils.infer_cell_type))
+    return df.apply(lambda col: col.map(utils.make_hashable_cell))
+
+
+def load_csv(csv_path: str, dtype=object) -> pd.DataFrame:
+    df = pd.read_csv(csv_path, dtype=dtype)
+    return normalize_dataframe(df)
+
+
+def load_json(json_path: str, orient: str = "records") -> pd.DataFrame:
+    df = pd.read_json(json_path, orient=orient)
+    df = df.astype(object, copy=False)
+    return normalize_dataframe(df)
+
+def load_mongodb_atlas(uri: str, database: str, collection: str, query: dict | None = None, projection: dict | None = None) -> pd.DataFrame:
+    try:
+        from pymongo import MongoClient
+    except ImportError as exc:
+        raise ImportError("pymongo is required to load MongoDB Atlas data; install it with `pip install pymongo`.") from exc
+
+    client = MongoClient(uri)
+    try:
+        cursor = client[database][collection].find(query or {}, projection)
+        df = pd.DataFrame(list(cursor))
+    finally:
+        client.close()
+
+    if '_id' in df.columns:
+        df['_id'] = df['_id'].astype(str)
+
+    df = df.astype(object, copy=False)
+    return normalize_dataframe(df)
+
+
+def infer_source_type(source_path: str) -> str:
+    extension = Path(source_path).suffix.lower()
+    if extension == '.csv':
+        return 'csv'
+    if extension in {'.json', '.ndjson'}:
+        return 'json'
+    raise ValueError(f"Unsupported file type: {extension}")
+
+
+def load_data(source_path: str, source_type: str | None = None, **kwargs) -> pd.DataFrame:
+    source_type = source_type or infer_source_type(source_path)
+    if source_type == 'csv':
+        return load_csv(source_path, **kwargs)
+    if source_type == 'json':
+        return load_json(source_path, **kwargs)
+    raise ValueError(f"Unsupported source type: {source_type}")
+
+
+def generate_profile(source_path='data/Autism_Data.csv', save_path='result.json', source_type: str | None = None, df: pd.DataFrame | None = None, **kwargs):
+    if df is None:
+        df = load_data(source_path, source_type=source_type, **kwargs)
+    else:
+        df = normalize_dataframe(df)
 
     results = {}
 

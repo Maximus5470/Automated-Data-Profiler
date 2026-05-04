@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import re
+import json
 
 def get_numerical_column_features(col):
     """Extract features for numerical columns."""
@@ -45,6 +46,16 @@ def get_categorical_column_features(col):
     features['cardinality'] = 'High' if features['num_unique'] > 10 else 'Medium' if features['num_unique'] > 3 else 'Low'
 
     return features
+
+
+def make_hashable_cell(value):
+    """Convert nested MongoDB values into a stable scalar representation."""
+    if isinstance(value, (list, dict, set, tuple, np.ndarray)):
+        try:
+            return json.dumps(value, default=str, sort_keys=True, ensure_ascii=False)
+        except TypeError:
+            return json.dumps(str(value), ensure_ascii=False)
+    return value
 
 NULL_STRINGS = {'', 'nan', 'none', 'null', 'na', 'n/a', '#n/a', 'missing'}
 DATE_RE = re.compile(r'^\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:[ T]\d{1,2}:\d{1,2}:\d{1,2})?|^\d{1,2}[-/]\d{1,2}[-/]\d{4}(?:[ T]\d{1,2}:\d{1,2}:\d{1,2})?')

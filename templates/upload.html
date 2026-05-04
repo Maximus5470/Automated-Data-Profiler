@@ -4,7 +4,7 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>DataProfile - Upload</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
 tailwind.config = {
     darkMode: "class",
@@ -32,37 +32,74 @@ body { min-height: 100dvh; }
 <!-- TopNavBar -->
 <header class="fixed top-0 z-50 w-full flex items-center justify-between px-6 h-16 bg-white shadow-sm border-b border-gray-100">
     <div class="flex items-center gap-3">
-        <span class="material-symbols-outlined text-indigo-600" data-icon="analytics">analytics</span>
+        <img class="h-10 w-10 rounded-md object-contain" src="/static/logo.png" alt="DataProfile logo">
         <h1 class="text-lg font-bold tracking-tight text-gray-900">DataProfile</h1>
     </div>
 </header>
 <!-- Main Canvas -->
 <main class="flex-grow flex items-center justify-center p-6 mt-16">
-    <form id="uploadForm" enctype="multipart/form-data" class="w-full max-w-md flex flex-col gap-6">
-        <div class="text-center space-y-2">
-            <h2 class="text-3xl font-semibold text-on-surface">Import Data</h2>
-            <p class="text-on-surface-variant max-w-[280px] mx-auto">Upload your CSV dataset to start the profiling process.</p>
+    <div class="w-full max-w-6xl grid gap-6 md:grid-cols-[1.1fr_auto_1fr]">
+        <form id="csvUploadForm" enctype="multipart/form-data" class="bg-white custom-dashed-border p-8 flex flex-col items-center justify-between text-center space-y-6 min-h-[420px] cursor-pointer hover:bg-surface-container transition-colors">
+            <div class="space-y-2 w-full">
+                <h2 class="text-3xl font-semibold text-on-surface">Import CSV Data</h2>
+                <p class="text-on-surface-variant max-w-[320px] mx-auto">Upload your CSV dataset to start the profiling process.</p>
+            </div>
+            <div id="uploadArea" class="w-full flex flex-col items-center justify-center text-center space-y-6 py-8 px-4 border border-dashed border-gray-200 rounded-3xl cursor-pointer hover:bg-surface-container transition-colors">
+                <input type="file" id="fileInput" accept=".csv,.json,.ndjson" name="files" class="hidden" multiple="multiple">
+                <div class="w-16 h-16 rounded-full bg-primary-fixed flex items-center justify-center pointer-events-none">
+                    <span class="material-symbols-outlined text-primary text-4xl" data-icon="cloud_upload">cloud_upload</span>
+                </div>
+                <div class="space-y-1 pointer-events-none">
+                    <p class="text-xl font-semibold text-on-surface">Drag and drop your files here</p>
+                    <p class="text-sm text-on-surface-variant">Max file size: 50MB</p>
+                </div>
+                <div id="selectedFile" class="hidden text-sm text-primary font-medium mt-2 pointer-events-none">Selected: <span id="fileName"></span></div>
+                <div id="loading" class="hidden text-sm text-primary font-medium mt-2 pointer-events-none">Processing your file...</div>
+                <button type="submit" id="submitBtn" class="bg-primary-container text-white px-8 py-3 rounded-lg font-bold uppercase tracking-widest active:scale-[0.98] transition-transform hover:bg-primary duration-150">
+                    Browse Files
+                </button>
+                <div class="flex items-center gap-2 pt-2 pointer-events-none justify-center">
+                    <span class="material-symbols-outlined text-primary text-base" data-icon="description">description</span>
+                    <span class="text-xs font-semibold text-on-surface-variant">Accepted formats: .csv, .json, .ndjson (Multiple allowed)</span>
+                </div>
+            </div>
+        </form>
+        <div class="hidden md:flex items-center justify-center">
+            <div class="h-full border-l border-dashed border-gray-300"></div>
         </div>
-        <div id="uploadArea" class="bg-white custom-dashed-border p-8 flex flex-col items-center justify-center text-center space-y-6 min-h-[320px] cursor-pointer hover:bg-surface-container transition-colors">
-            <input type="file" id="fileInput" accept=".csv" name="files" class="hidden" multiple="multiple">
-            <div class="w-16 h-16 rounded-full bg-primary-fixed flex items-center justify-center pointer-events-none">
-                <span class="material-symbols-outlined text-primary text-4xl" data-icon="cloud_upload">cloud_upload</span>
+        <form id="mongoForm" action="#" method="post" class="bg-white custom-dashed-border p-8 space-y-6 min-h-[420px]">
+            <div class="space-y-2 text-center">
+                <h2 class="text-3xl font-semibold text-on-surface">MongoDB Atlas</h2>
+                <p class="text-on-surface-variant max-w-[320px] mx-auto">Connect to a MongoDB Atlas cluster to profile your selected collection.</p>
             </div>
-            <div class="space-y-1 pointer-events-none">
-                <p class="text-xl font-semibold text-on-surface">Drag and drop your files here</p>
-                <p class="text-sm text-on-surface-variant">Max file size: 50MB</p>
+            <div class="grid gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-on-surface mb-1">Atlas Connection URI</label>
+                    <input id="mongoUri" name="mongo_uri" type="text"
+                        placeholder="mongodb+srv://username:password@cluster0.example.mongodb.net"
+                        class="w-full rounded-2xl border border-gray-200 bg-surface p-3 text-sm text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required>
+                    <p class="mt-1 text-xs text-on-surface-variant">Paste your Atlas SRV URI as-is and enter the database name separately below.</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-on-surface mb-1">Database Name</label>
+                    <input id="mongoDatabase" name="mongo_database" type="text" placeholder="my_database"
+                        class="w-full rounded-2xl border border-gray-200 bg-surface p-3 text-sm text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-on-surface mb-1">Collection Name</label>
+                    <input id="mongoCollection" name="mongo_collection" type="text" placeholder="my_collection"
+                        class="w-full rounded-2xl border border-gray-200 bg-surface p-3 text-sm text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" required>
+                    <p class="mt-1 text-xs text-on-surface-variant">Arrays and nested documents are supported; they will be converted into profile-safe values automatically.</p>
+                </div>
             </div>
-            <div id="selectedFile" class="hidden text-sm text-primary font-medium mt-2 pointer-events-none">Selected: <span id="fileName"></span></div>
-            <div id="loading" class="hidden text-sm text-primary font-medium mt-2 pointer-events-none">Processing your file...</div>
-            <button type="submit" id="submitBtn" class="bg-primary-container text-white px-8 py-3 rounded-lg font-bold uppercase tracking-widest active:scale-[0.98] transition-transform hover:bg-primary duration-150">
-                Browse Files
-            </button>
-            <div class="flex items-center gap-2 pt-2 pointer-events-none">
-                <span class="material-symbols-outlined text-primary text-base" data-icon="description">description</span>
-                <span class="text-xs font-semibold text-on-surface-variant">Accepted format: .csv (Multiple allowed)</span>
+            <div class="flex flex-col gap-3">
+                <button type="submit" class="w-full bg-primary-container text-white px-6 py-3 rounded-lg font-bold uppercase tracking-widest active:scale-[0.98] transition-transform hover:bg-primary duration-150">
+                    Connect & Analyze
+                </button>
+                <p class="text-xs text-on-surface-variant">Use MongoDB Atlas credentials to connect and select the collection you want to profile.</p>
             </div>
-        </div>
-    </form>
+        </form>
+    </div>
 </main>
 <!-- Toast container -->
 <div id="toastContainer" class="fixed top-6 right-6 z-50 flex flex-col gap-2"></div>
@@ -116,7 +153,9 @@ body { min-height: 100dvh; }
     const fileInput = document.getElementById('fileInput');
     const selectedFile = document.getElementById('selectedFile');
     const fileName = document.getElementById('fileName');
-    const uploadForm = document.getElementById('uploadForm');
+    const csvForm = document.getElementById('csvUploadForm');
+    const mongoForm = document.getElementById('mongoForm');
+    const mongoSubmitBtn = mongoForm.querySelector('button[type="submit"]');
     const loading = document.getElementById('loading');
     const submitBtn = document.getElementById('submitBtn');
 
@@ -172,7 +211,7 @@ body { min-height: 100dvh; }
         }
     });
 
-    uploadForm.addEventListener('submit', async (e) => {
+    csvForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         if (fileInput.files.length === 0) {
             fileInput.click();
@@ -242,6 +281,38 @@ body { min-height: 100dvh; }
             loading.classList.add('hidden');
             submitBtn.disabled = false;
         }
+    });
+
+    mongoForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+
+        const formData = new FormData(mongoForm);
+
+        mongoSubmitBtn.disabled = true;
+        const originalText = mongoSubmitBtn.textContent;
+        mongoSubmitBtn.textContent = 'Analyzing...';
+
+        fetch('/mongo-upload', { method: 'POST', body: formData })
+            .then(async (response) => {
+                const data = await response.json().catch(() => null);
+
+                if (response.ok && data && data.status === 'success' && data.file_id) {
+                    window.location.href = `/analysis/${encodeURIComponent(data.file_id)}`;
+                    return;
+                }
+
+                const message = data && (data.detail || data.message)
+                    ? (data.detail || data.message)
+                    : 'Error connecting to MongoDB Atlas. Please check the credentials and try again.';
+                showToast(message, 'error');
+            })
+            .catch((error) => {
+                showToast('Network or client error: ' + (error.message || error), 'error');
+            })
+            .finally(() => {
+                mongoSubmitBtn.disabled = false;
+                mongoSubmitBtn.textContent = originalText;
+            });
     });
 </script>
 </body>
