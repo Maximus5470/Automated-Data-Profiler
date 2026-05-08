@@ -4,6 +4,9 @@ import json
 import numpy as np
 from pathlib import Path
 from datetime import date, datetime
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName("DataProfiling").getOrCreate()
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -20,14 +23,15 @@ def normalize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return df.apply(lambda col: col.map(utils.make_hashable_cell))
 
 
-def load_csv(csv_path: str, dtype=object) -> pd.DataFrame:
-    df = pd.read_csv(csv_path, dtype=dtype)
+def load_csv(csv_path: str) -> pd.DataFrame:
+    df = spark.read.csv(csv_path, header=True)
+    df = df.toPandas()
     return normalize_dataframe(df)
 
 
-def load_json(json_path: str, orient: str = "records") -> pd.DataFrame:
-    df = pd.read_json(json_path, orient=orient)
-    df = df.astype(object, copy=False)
+def load_json(json_path: str) -> pd.DataFrame:
+    df = spark.read.json(json_path, multiLine=True)
+    df = df.toPandas()
     return normalize_dataframe(df)
 
 def load_mongodb_atlas(uri: str, database: str, collection: str, query: dict | None = None, projection: dict | None = None) -> pd.DataFrame:
@@ -45,8 +49,6 @@ def load_mongodb_atlas(uri: str, database: str, collection: str, query: dict | N
 
     if '_id' in df.columns:
         df['_id'] = df['_id'].astype(str)
-
-    df = df.astype(object, copy=False)
     return normalize_dataframe(df)
 
 
@@ -59,18 +61,18 @@ def infer_source_type(source_path: str) -> str:
     raise ValueError(f"Unsupported file type: {extension}")
 
 
-def load_data(source_path: str, source_type: str | None = None, **kwargs) -> pd.DataFrame:
+def load_data(source_path: str, source_type: str | None = None) -> pd.DataFrame:
     source_type = source_type or infer_source_type(source_path)
     if source_type == 'csv':
-        return load_csv(source_path, **kwargs)
+        return load_csv(source_path)
     if source_type == 'json':
-        return load_json(source_path, **kwargs)
+        return load_json(source_path)
     raise ValueError(f"Unsupported source type: {source_type}")
 
 
-def generate_profile(source_path='data/Autism_Data.csv', save_path='results/result.json', source_type: str | None = None, df: pd.DataFrame | None = None, **kwargs):
+def generate_profile(source_path='data/Autism_Data.csv', save_path='results/result.json', source_type: str | None = None, df: pd.DataFrame | None = None):
     if df is None:
-        df = load_data(source_path, source_type=source_type, **kwargs)
+        df = load_data(source_path, source_type=source_type)
     else:
         df = normalize_dataframe(df)
 
