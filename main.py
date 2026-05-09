@@ -6,7 +6,11 @@ from pathlib import Path
 from datetime import date, datetime
 from pyspark.sql import SparkSession
 
-spark = SparkSession.builder.appName("DataProfiling").getOrCreate()
+spark = SparkSession.builder \
+    .appName("DataProfiling") \
+    .config("spark.jars.packages",
+                "org.mongodb.spark:mongo-spark-connector_2.12:10.3.0") \
+    .getOrCreate()
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -34,22 +38,15 @@ def load_json(json_path: str) -> pd.DataFrame:
     df = df.toPandas()
     return normalize_dataframe(df)
 
-def load_mongodb_atlas(uri: str, database: str, collection: str, query: dict | None = None, projection: dict | None = None) -> pd.DataFrame:
-    try:
-        from pymongo import MongoClient
-    except ImportError as exc:
-        raise ImportError("pymongo is required to load MongoDB Atlas data; install it with `pip install pymongo`.") from exc
+def load_mongodb_atlas(uri: str, database: str, collection: str) -> pd.DataFrame:
+    df = spark.read \
+        .format("mongodb") \
+        .option("spark.mongodb.read.connection.uri", uri) \
+        .option("database", database) \
+        .option("collection", collection) \
+        .load()
 
-    client = MongoClient(uri)
-    try:
-        cursor = client[database][collection].find(query or {}, projection)
-        df = pd.DataFrame(list(cursor))
-    finally:
-        client.close()
-
-    if '_id' in df.columns:
-        df['_id'] = df['_id'].astype(str)
-    return normalize_dataframe(df)
+    return spark.createDataFrame(df.rdd, schema=df.schema).toPandas()
 
 
 def infer_source_type(source_path: str) -> str:
@@ -61,8 +58,8 @@ def infer_source_type(source_path: str) -> str:
     raise ValueError(f"Unsupported file type: {extension}")
 
 
-def load_data(source_path: str, source_type: str | None = None) -> pd.DataFrame:
-    source_type = source_type or infer_source_type(source_path)
+def load_data(source_path: str) -> pd.DataFrame:
+    source_type = infer_source_type(source_path)
     if source_type == 'csv':
         return load_csv(source_path)
     if source_type == 'json':
@@ -70,9 +67,9 @@ def load_data(source_path: str, source_type: str | None = None) -> pd.DataFrame:
     raise ValueError(f"Unsupported source type: {source_type}")
 
 
-def generate_profile(source_path='data/Autism_Data.csv', save_path='results/result.json', source_type: str | None = None, df: pd.DataFrame | None = None):
+def generate_profile(source_path='data/Autism_Data.csv', save_path='results/result.json', df: pd.DataFrame | None = None):
     if df is None:
-        df = load_data(source_path, source_type=source_type)
+        df = load_data(source_path)
     else:
         df = normalize_dataframe(df)
 
